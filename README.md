@@ -1,78 +1,30 @@
-# BE-02 CRUD API with SQLite
+# BE-04 A3 - Containerize Your Stack
 
 ## Overview
 
-This project is a simple CRUD API built with Express.js and SQLite.
+Containerized the Task API with PostgreSQL using Docker Compose.
 
-Instead of storing tasks in an in-memory array, all tasks are stored in a SQLite database.
-
-Data remains available even after restarting the server.
-
----
-
-## Technologies
+## Stack
 
 - Node.js
-- Express.js
-- SQLite
-- better-sqlite3
+- Express
+- PostgreSQL 16
+- Docker
+- Docker Compose
 
----
+## Implementation
 
-## Why SQLite?
+- PostgreSQL runs inside Docker.
+- PostgreSQL data is persisted using a Docker volume.
+- Database connection is provided through .env.
+- .env.example is committed to the repository.
+- The tasks table is created using db/schema.sql.
+- A PostgreSQL repository replaces the previous storage implementation.
+- Service and API routes remain unchanged.
 
-SQLite is lightweight, fast, requires no separate database server, and stores everything in a single file.
+## Run the Application
 
----
-
-## Database
-
-Database file:
-
-```
-tasks.db
-```
-
----
-
-## Installation
+Start the complete stack with:
 
 ```bash
-npm install
-node server.js
-```
-
-Server:
-
-```
-http://localhost:3000
-```
-
----
-
-## API Endpoints
-
-GET /
-
-GET /health
-
-GET /tasks
-
-GET /tasks/:id
-
-POST /tasks
-
-PUT /tasks/:id
-
-DELETE /tasks/:id
-
----
-
-## Example SQL Query
-
-```sql
-SELECT * FROM tasks;
-```
-
----<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/9adf417d-fe7c-4093-afa7-3dc64a155eb4" />
-
+docker compose up -d

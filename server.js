@@ -1,5 +1,5 @@
 const express = require("express");
-const db = require("./database");
+const taskRepository = require("./repositories/taskRepository");
 
 const app = express();
 
@@ -12,135 +12,158 @@ app.get("/", (req, res) => {
         endpoints: ["/tasks"]
     });
 });
+
 app.get("/health", (req, res) => {
     res.json({
         status: "ok"
     });
 });
 
-app.get("/tasks", (req, res) => {
-
-    const tasks = db.prepare("SELECT * FROM tasks").all();
-
-    res.json(tasks);
-
+// GET all tasks
+app.get("/tasks", async (req, res) => {
+    try {
+        const tasks = await taskRepository.getAllTasks();
+        res.json(tasks);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed to fetch tasks"
+        });
+    }
 });
 
-app.get("/tasks/:id", (req, res) => {
+// GET task by ID
+app.get("/tasks/:id", async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
 
-    const id = parseInt(req.params.id);
-
-    const task = db
-        .prepare("SELECT * FROM tasks WHERE id = ?")
-        .get(id);
-
-    if (!task) {
-
-        return res.status(404).json({
-            error: `Task ${id} not found`
+    if (Number.isNaN(id)) {
+        return res.status(400).json({
+            error: "Invalid task ID"
         });
-
     }
 
-    res.json(task);
+    try {
+        const task = await taskRepository.getTaskById(id);
 
+        if (!task) {
+            return res.status(404).json({
+                error: `Task ${id} not found`
+            });
+        }
+
+        res.json(task);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed to fetch task"
+        });
+    }
 });
 
-app.post("/tasks", (req, res) => {
-
+// CREATE task
+app.post("/tasks", async (req, res) => {
     const { title } = req.body;
 
-    // Validation
-    if (!title || title.trim() === "") {
+    if (!title || typeof title !== "string" || title.trim() === "") {
         return res.status(400).json({
             error: "Title is required"
         });
     }
 
-    // Insert into database
-    const result = db
-        .prepare("INSERT INTO tasks (title, done) VALUES (?, ?)")
-        .run(title.trim(), 0);
-
-    // Get newly created task
-    const newTask = db
-        .prepare("SELECT * FROM tasks WHERE id = ?")
-        .get(result.lastInsertRowid);
-
-    res.status(201).json(newTask);
-
+    try {
+        const newTask = await taskRepository.createTask(title.trim(), 0);
+        res.status(201).json(newTask);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed to create task"
+        });
+    }
 });
 
-
-app.put("/tasks/:id", (req, res) => {
-
-    const id = parseInt(req.params.id);
+// UPDATE task
+app.put("/tasks/:id", async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
     const { title, done } = req.body;
 
-    // Check if task exists
-    const task = db
-        .prepare("SELECT * FROM tasks WHERE id = ?")
-        .get(id);
-
-    if (!task) {
-        return res.status(404).json({
-            error: `Task ${id} not found`
+    if (Number.isNaN(id)) {
+        return res.status(400).json({
+            error: "Invalid task ID"
         });
     }
 
-    // Validation
     if (
-        (title !== undefined && (typeof title !== "string" || title.trim() === "")) ||
-        (done !== undefined && typeof done !== "number")
+        (title !== undefined &&
+            (typeof title !== "string" || title.trim() === "")) ||
+        (done !== undefined &&
+            (typeof done !== "number" || !Number.isInteger(done)))
     ) {
         return res.status(400).json({
             error: "Invalid title or done value"
         });
     }
 
-    // Keep old values if not provided
-    const updatedTitle = title !== undefined ? title.trim() : task.title;
-    const updatedDone = done !== undefined ? done : task.done;
+    try {
+        const task = await taskRepository.getTaskById(id);
 
-    // Update database
-    db.prepare(`
-        UPDATE tasks
-        SET title = ?, done = ?
-        WHERE id = ?
-    `).run(updatedTitle, updatedDone, id);
+        if (!task) {
+            return res.status(404).json({
+                error: `Task ${id} not found`
+            });
+        }
 
-    // Return updated task
-    const updatedTask = db
-        .prepare("SELECT * FROM tasks WHERE id = ?")
-        .get(id);
+        const updatedTitle =
+            title !== undefined ? title.trim() : task.title;
 
-    res.json(updatedTask);
+        const updatedDone =
+            done !== undefined ? done : task.done;
 
+        const updatedTask = await taskRepository.updateTask(
+            id,
+            updatedTitle,
+            updatedDone
+        );
+
+        res.json(updatedTask);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed to update task"
+        });
+    }
 });
 
+// DELETE task
+app.delete("/tasks/:id", async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
 
-app.delete("/tasks/:id", (req, res) => {
-
-    const id = parseInt(req.params.id);
-
-    // Check if task exists
-    const task = db
-        .prepare("SELECT * FROM tasks WHERE id = ?")
-        .get(id);
-
-    if (!task) {
-        return res.status(404).json({
-            error: `Task ${id} not found`
+    if (Number.isNaN(id)) {
+        return res.status(400).json({
+            error: "Invalid task ID"
         });
     }
 
-    // Delete task
-    db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+    try {
+        const task = await taskRepository.getTaskById(id);
 
-    res.status(204).send();
+        if (!task) {
+            return res.status(404).json({
+                error: `Task ${id} not found`
+            });
+        }
 
+        await taskRepository.deleteTask(id);
+
+        res.status(204).send();
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed to delete task"
+        });
+    }
 });
-const PORT = 3000;
+
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
